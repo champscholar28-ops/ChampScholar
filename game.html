@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Ball Breaker 2025 - Game</title>
+<style>
+  body {
+    background: #222;
+    margin: 0;
+    overflow: hidden;
+    user-select: none;
+  }
+  canvas {
+    background: #000;
+    border: 2px solid #fff;
+    display: block;
+    margin: 0 auto;
+  }
+  #settingsIcon {
+    position: absolute; top: 10px; left: 10px; width: 32px; height: 32px; cursor: pointer; z-index: 1001;
+    font-size: 28px; display: flex; align-items: center; justify-content: center;
+  }
+  #settingsPanel {
+    position: absolute; top: 50px; left: 10px; color: white;
+    font-family: Arial; background: rgba(0,0,0,0.7); padding: 8px 14px;
+    border-radius: 6px; display: none; z-index: 1000; width: 230px;
+  }
+  #settingsPanel label { display: flex; align-items: center; margin: 6px 0; font-size: 14px; }
+  #settingsPanel input[type=checkbox] { margin-right: 8px; cursor: pointer;}
+  #settingsPanel input[type=number] { width: 50px; margin-left: 8px; text-align: center; border-radius: 3px; border: none;}
+  #notificationBar {
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    background: #333; color: white;
+    padding: 10px 20px; border-radius: 4px;
+    font-family: Arial; display: none;
+    z-index: 1000;
+  }
+  #waveMessage {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.8); color: #fff;
+    font-family: Arial, sans-serif;
+    font-size: 2rem;
+    padding: 30px 70px;
+    border-radius: 16px;
+    text-align: center;
+    z-index: 2000;
+    display: none;
+    pointer-events: none;
+  }
+  #backButton {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #555;
+    color: white;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    z-index: 1001;
+  }
+  #backButton:hover {
+    background: #777;
+  }
+</style>
+</head>
+<body>
+<button id="backButton" title="Back to Home">Home</button>
+<div id="settingsIcon" title="Settings">⚙️</div>
+<div id="settingsPanel">
+  <label><input type="checkbox" id="alertCheckbox" /> Alert</label>
+  <label><input type="checkbox" id="notificationCheckbox" /> Notification</label>
+  <label><input type="checkbox" id="wavesCheckbox" /> Waves</label>
+  <label>Number of Waves: <input type="number" id="wavesNumber" value="2" min="1" max="10" /></label>
+  <label>Rows per Wave: <input type="number" id="rowsPerWaveNumber" value="4" min="1" max="8" /></label>
+  <label>Lives Per Wave: <input type="number" id="livesPerWaveNumber" value="3" min="1" max="5" /></label>
+</div>
+<canvas id="myCanvas" width="480" height="320"></canvas>
+<div id="notificationBar"></div>
+<div id="waveMessage"></div>
+
+<script>
+// Back button to homepage
+document.getElementById("backButton").addEventListener("click", () => {
+  window.location.href = "index.html";
+});
+
+const canvas=document.getElementById("myCanvas"),ctx=canvas.getContext("2d");
+const settingsIcon=document.getElementById("settingsIcon"),settingsPanel=document.getElementById("settingsPanel"),
+alertCheckbox=document.getElementById("alertCheckbox"), notificationCheckbox=document.getElementById("notificationCheckbox"),
+wavesCheckbox=document.getElementById("wavesCheckbox"),wavesNumberInput=document.getElementById("wavesNumber"),
+rowsPerWaveNumberInput=document.getElementById("rowsPerWaveNumber"),livesPerWaveInput=document.getElementById("livesPerWaveNumber"),
+notificationBar=document.getElementById("notificationBar"),waveMessage=document.getElementById("waveMessage");
+settingsIcon.onclick = () => {
+  if (settingsPanel.style.display === "block") {
+    settingsPanel.style.display = "none";
+    gamePaused = false;
+    draw(); // resume
+  } else {
+    settingsPanel.style.display = "block";
+    gamePaused = true;
+  }
+};
+
+let gamePaused = false;
+let ballRadius=10,paddleHeight=10,paddleWidth=100,paddleX,paddleSpeed=10;
+let popBallRadius=12,popBallColumnCount=7,popBallPadding=10,popBallOffsetTop=30;
+let popBalls=[],totalWaves=0,rowsPerWave=0,currentWaveIndex=0,animatingWaves=false,waveReady=false,waitingForWave=false,waveSlideSpeed=5;
+let lives=3,livesPerWave=3,score=0,x,y,dx,dy,speed=4;
+let rightPressed=false,leftPressed=false;
+let gameEnded=false;
+
+function getRandomColor(){return ["#FF0000","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF","#FFA500","#FF69B4"][Math.floor(Math.random()*8)];}
+function generatePopBallsGrid(waves,rows){
+  popBalls=[];totalWaves=waves;rowsPerWave=rows;currentWaveIndex=0;animatingWaves=wavesCheckbox.checked;waveReady=false;waitingForWave=false;
+  const totalWidth=popBallColumnCount*(popBallRadius*2)+(popBallColumnCount-1)*popBallPadding;
+  const startX=(canvas.width-totalWidth)/2+popBallRadius;
+  for(let r=0;r<waves*rows;r++){
+    for(let c=0;c<popBallColumnCount;c++){
+      const ballX=startX+c*(popBallRadius*2+popBallPadding),waveIndex=Math.floor(r/rows),
+      baseY=popBallOffsetTop+r*(popBallRadius*2+popBallPadding),startYOffset=-(rows*(popBallRadius*2+popBallPadding));
+      popBalls.push({x:ballX,y:baseY+(waveIndex===0?startYOffset:-5000),baseY,radius:popBallRadius,
+        color:getRandomColor(),status:waveIndex===0?1:0,popping:false,wave:waveIndex});
+    }
+  }
+  lives=livesPerWave;
+}
+function startNextWave(){
+  currentWaveIndex++;
+  if(currentWaveIndex>=totalWaves){ animatingWaves=false; return;}
+  lives=livesPerWave; waveReady=false; waitingForWave=true;
+  showWaveMessage(currentWaveIndex+1,()=>{
+    for(const pb of popBalls){
+      if(pb.wave===currentWaveIndex){
+        pb.status=1; pb.radius=popBallRadius; pb.popping=false;
+        pb.y=pb.baseY-(rowsPerWave*(popBallRadius*2+popBallPadding));
+      }
+    }
+    waitingForWave=false;
+  });
+}
+function showWaveMessage(waveNumber,doneCallback){
+  waveMessage.textContent="Wave "+waveNumber+" Starting!";
+  waveMessage.style.display="block";
+  setTimeout(()=>{
+    waveMessage.style.display="none";
+    if(doneCallback) doneCallback();
+  },1000);
+}
+function drawPopBalls(){
+  for(const pb of popBalls){
+    if(pb.status===1 || pb.popping){
+      ctx.beginPath(); ctx.arc(pb.x,pb.y,pb.radius,0,Math.PI*2);
+      ctx.fillStyle=pb.color; ctx.fill(); ctx.closePath();
+    }
+  }
+}
+function updateWaveAnimations(){
+  if(!animatingWaves||waitingForWave) return;
+  let stillMoving=false;
+  for(const pb of popBalls){
+    if(pb.wave===currentWaveIndex&&pb.status===1&&pb.y<pb.baseY){
+      pb.y+=waveSlideSpeed;if(pb.y>pb.baseY) pb.y=pb.baseY;stillMoving=true;
+    }
+  }
+  if(!stillMoving) waveReady=true;
+}
+function checkWaveCleared(){return !popBalls.some(pb=>pb.wave===currentWaveIndex&&pb.status===1);}
+function updatePopAnimations(){
+  for(const pb of popBalls){
+    if(pb.popping){
+      pb.radius-=0.8;
+      if(pb.radius<=0){ pb.popping=false; pb.status=0; }
+    }
+  }
+}
+function popBallCollision(){
+  if(gameEnded || gamePaused) return;
+  if(animatingWaves&&(!waveReady||waitingForWave)) return;
+  for(const pb of popBalls){
+    if(pb.status==1){
+      const dxCol=x-pb.x,dyCol=y-pb.y;
+      if(Math.sqrt(dxCol*dxCol+dyCol*dyCol)<ballRadius+pb.radius){
+        pb.popping=true;pb.status=0;score++;dy=-dy;
+        if(score===totalWaves*rowsPerWave*popBallColumnCount) handleGameEnd(true);
+      }
+    }
+  }
+}
+function showNotification(msg){
+  notificationBar.textContent=msg;notificationBar.style.display="block";
+  setTimeout(()=>notificationBar.style.display="none",3000);
+}
+function finishToHome(){
+  window.location.href = "index.html";
+}
+function handleGameEnd(win){
+  gameEnded=true;
+  if(alertCheckbox.checked) alert(win?"YOU WIN, ALL BALLS POPPED!":"GAME OVER");
+  if(notificationCheckbox.checked) showNotification(win?"You Win, All Balls Popped":"You Lost Your Lives");
+  setTimeout(finishToHome,500);
+}
+document.addEventListener("keydown",e=>{if(e.key==="ArrowRight") rightPressed=true; else if(e.key==="ArrowLeft") leftPressed=true;});
+document.addEventListener("keyup",e=>{if(e.key==="ArrowRight") rightPressed=false; else if(e.key==="ArrowLeft") leftPressed=false;});
+document.addEventListener("mousemove",e=>{
+  const relX=e.clientX-canvas.offsetLeft;if(relX>0&&relX<canvas.width) paddleX=relX-paddleWidth/2;
+});
+function drawBall(){ctx.beginPath(); ctx.arc(x,y,ballRadius,0,Math.PI*2); ctx.fillStyle="#fff"; ctx.fill(); ctx.closePath();}
+function drawPaddle(){ctx.beginPath();ctx.rect(paddleX,canvas.height-paddleHeight-5,paddleWidth,paddleHeight); ctx.fillStyle="#0095DD";ctx.fill();ctx.closePath();}
+function drawScore(){ctx.fillStyle="#fff";ctx.font="16px Arial";ctx.fillText("Score: "+score,8,20);}
+function drawLives(){ctx.fillStyle="#fff";ctx.font="16px Arial";ctx.fillText("Lives: "+lives,canvas.width-75,20);}
+function draw(){
+  if(gamePaused) return; // don't animate when paused
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  updateWaveAnimations();
+  updatePopAnimations();
+  drawPopBalls(); drawBall(); drawPaddle(); drawScore(); drawLives();
+  popBallCollision();
+
+  if(animatingWaves&&waveReady&&checkWaveCleared()&&!waitingForWave) startNextWave();
+
+  x+=dx;y+=dy;
+  if(x+dx>canvas.width-ballRadius||x+dx<ballRadius) dx=-dx;
+  if(y+dy<ballRadius) dy=-dy;
+  else if(y+dy>canvas.height-ballRadius-paddleHeight-5){
+    if(x>paddleX&&x<paddleX+paddleWidth){
+      const hitPos=(x-(paddleX+paddleWidth/2))/(paddleWidth/2);
+      const angle=hitPos*(Math.PI/3),spd=Math.sqrt(dx*dx+dy*dy);
+      dx=spd*Math.sin(angle);dy=-Math.abs(spd*Math.cos(angle));
+    } else {
+      if(!gameEnded && --lives<=0) handleGameEnd(false);
+      else { x=canvas.width/2; y=canvas.height-50; dx=speed*(Math.random()<0.5?-1:1); dy=-speed; }
+    }
+  }
+  if(rightPressed&&paddleX<canvas.width-paddleWidth) paddleX+=paddleSpeed;
+  if(leftPressed&&paddleX>0) paddleX-=paddleSpeed;
+  if(!gameEnded) requestAnimationFrame(draw);
+}
+
+(function startGame(){
+  settingsPanel.style.display = "none";
+  canvas.style.display = "block";
+  score=0; paddleX=(canvas.width-paddleWidth)/2; gameEnded=false;
+
+  // Load saved settings from localStorage if available
+  alertCheckbox.checked = JSON.parse(localStorage.getItem('alert')) || false;
+  notificationCheckbox.checked = JSON.parse(localStorage.getItem('notification')) || false;
+  wavesCheckbox.checked = JSON.parse(localStorage.getItem('waves')) || false;
+  wavesNumberInput.value = localStorage.getItem('wavesNum') || 2;
+  rowsPerWaveNumberInput.value = localStorage.getItem('rowsPerWave') || 4;
+  livesPerWaveInput.value = localStorage.getItem('livesPerWave') || 3;
+
+  let waves=parseInt(wavesNumberInput.value)||2;
+  if(waves>10) waves=10;
+  let rows=parseInt(rowsPerWaveNumberInput.value)||4;
+  if(rows>8) rows=8;
+  livesPerWave=parseInt(livesPerWaveInput.value)||3;
+  if(livesPerWave>5) livesPerWave=5;
+
+  if(wavesCheckbox.checked) {
+    generatePopBallsGrid(waves,rows);
+    showWaveMessage(1,()=>{});
+  } else {
+    totalWaves=1; rowsPerWave=4; popBalls=[];
+    const totalWidth=popBallColumnCount*(popBallRadius*2)+(popBallColumnCount-1)*popBallPadding;
+    const startX=(canvas.width-totalWidth)/2+popBallRadius;
+    for(let r=0;r<rowsPerWave*totalWaves;r++)for(let c=0;c<popBallColumnCount;c++){
+      const ballX=startX+c*(popBallRadius*2+popBallPadding),ballY=popBallOffsetTop+r*(popBallRadius*2+popBallPadding);
+      popBalls.push({x:ballX,y:ballY,baseY:ballY,radius:popBallRadius,color:getRandomColor(),status:1,popping:false,wave:0});}
+    animatingWaves=false; lives=livesPerWave;
+  }
+  x=canvas.width/2; y=canvas.height-50; dx=speed*(Math.random()<0.5?-1:1); dy=-speed;
+  draw();
+})();
+</script>
+</body>
+</html>

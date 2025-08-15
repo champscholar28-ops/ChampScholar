@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Ball Breaker 2025 - Home</title>
+<style>
+  body {
+    background: #222;
+    color: white;
+    font-family: Arial, sans-serif;
+    height: 100vh;
+    margin: 0;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  h1 { font-size: 48px; margin-bottom: 30px; }
+  a {
+    text-decoration: none;
+    font-size: 24px;
+    background: #28a745;
+    padding: 12px 30px;
+    border-radius: 8px;
+    color: white;
+    transition: background 0.3s;
+    margin-bottom: 20px;
+  }
+  a:hover { background: #218838; }
+  #settingsContainer {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+  }
+  #settingsIcon {
+    cursor: pointer;
+    font-size: 28px;
+    user-select: none;
+    display: flex;
+    align-items: center;
+  }
+  #settingsPanel {
+    background: rgba(0,0,0,0.7);
+    padding: 8px 14px;
+    border-radius: 6px;
+    width: 230px;
+    color: white;
+    font-family: Arial;
+    display: none;
+    margin-top: 5px;
+  }
+  #settingsPanel label {
+    display: flex;
+    align-items: center;
+    margin: 6px 0;
+    font-size: 14px;
+  }
+  #settingsPanel input[type=checkbox] {
+    margin-right: 8px;
+  }
+  #settingsPanel input[type=number] {
+    width: 50px;
+    margin-left: 8px;
+    border-radius: 3px;
+    border: none;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+  <div id="settingsContainer">
+    <div id="settingsIcon" title="Settings">⚙️</div>
+    <div id="settingsPanel">
+      <label><input type="checkbox" id="alertCheckboxHome" /> Alert</label>
+      <label><input type="checkbox" id="notificationCheckboxHome" /> Notification</label>
+      <label><input type="checkbox" id="wavesCheckboxHome" /> Waves</label>
+      <label>Number of Waves: <input type="number" id="wavesNumberHome" value="2" min="1" max="10" /></label>
+      <label>Rows per Wave: <input type="number" id="rowsPerWaveNumberHome" value="4" min="1" max="8" /></label>
+      <label>Lives Per Wave: <input type="number" id="livesPerWaveNumberHome" value="3" min="1" max="5" /></label>
+    </div>
+  </div>
+  <h1>Ball Breaker 2025</h1>
+  <a href="game.html" id="playGameLink">Play Game</a>
+
+  <script>
+    const settingsIcon = document.getElementById('settingsIcon');
+    const settingsPanel = document.getElementById('settingsPanel');
+    settingsIcon.addEventListener('click', () => {
+      settingsPanel.style.display = settingsPanel.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // Save settings to localStorage on change
+    function saveSettings() {
+      localStorage.setItem('alert', alertCheckboxHome.checked);
+      localStorage.setItem('notification', notificationCheckboxHome.checked);
+      localStorage.setItem('waves', wavesCheckboxHome.checked);
+      localStorage.setItem('wavesNum', wavesNumberHome.value);
+      localStorage.setItem('rowsPerWave', rowsPerWaveNumberHome.value);
+      localStorage.setItem('livesPerWave', livesPerWaveNumberHome.value);
+    }
+
+    // Elements references
+    const alertCheckboxHome = document.getElementById('alertCheckboxHome');
+    const notificationCheckboxHome = document.getElementById('notificationCheckboxHome');
+    const wavesCheckboxHome = document.getElementById('wavesCheckboxHome');
+    const wavesNumberHome = document.getElementById('wavesNumberHome');
+    const rowsPerWaveNumberHome = document.getElementById('rowsPerWaveNumberHome');
+    const livesPerWaveNumberHome = document.getElementById('livesPerWaveNumberHome');
+
+    // Load stored settings
+    window.onload = function() {
+      if(localStorage.getItem('alert') !== null) alertCheckboxHome.checked = localStorage.getItem('alert') === 'true';
+      if(localStorage.getItem('notification') !== null) notificationCheckboxHome.checked = localStorage.getItem('notification') === 'true';
+      if(localStorage.getItem('waves') !== null) wavesCheckboxHome.checked = localStorage.getItem('waves') === 'true';
+      if(localStorage.getItem('wavesNum') !== null) wavesNumberHome.value = localStorage.getItem('wavesNum');
+      if(localStorage.getItem('rowsPerWave') !== null) rowsPerWaveNumberHome.value = localStorage.getItem('rowsPerWave');
+      if(localStorage.getItem('livesPerWave') !== null) livesPerWaveNumberHome.value = localStorage.getItem('livesPerWave');
+    };
+
+    [alertCheckboxHome, notificationCheckboxHome, wavesCheckboxHome, wavesNumberHome, rowsPerWaveNumberHome, livesPerWaveNumberHome].forEach(el => {
+      el.addEventListener('change', saveSettings);
+    });
+  </script>
+</body>
+</html>
